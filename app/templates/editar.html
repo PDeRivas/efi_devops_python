@@ -1,0 +1,23 @@
+{% extends 'layout.html' %}
+{% block title %}Editar{% endblock%}
+
+{% block body %}
+<section id="editar" class="container mt-3">
+    <form action="/editar_post" method="post">
+        <div> <input type="text" name="usuario_id" id="usuario" value="{{usuario_id}}" style="display:
+            none;"></div>
+        <div> <input type="text" name="post_id" id="post" value="{{post_id}}" style="display:
+            none;"></div>
+        <div class="col-12 mb-3">
+            <p>Titulo:</p>
+            <input type="text" name="titulo_editado" class="form-control" id="titulo" value="{{titulo}}" placeholder="Título" required>
+        </div>
+        <div class="col-md-12 mb-3">
+            <p>Contenido:</p>
+            <textarea class="form-control" name="contenido_editado" placeholder="Edite su contenido"  id="contenido"
+                style="height: 100px" required>{{contenido}}</textarea>
+        </div>
+        <button type="submit" class="btn btn-primary">Terminar Edición</button>
+    </form>
+</section>
+{% endblock %}
