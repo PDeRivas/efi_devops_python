@@ -65,6 +65,13 @@ def iniciar_sesion():
         except:
             return redirect(url_for('index'))
 
+@app.route("/registro", methods=['POST'])
+def registro():
+    if request.method=='POST':
+        return render_template(
+            'registrarse.html'
+        )
+
 @app.route('/registrarse', methods=['POST'])
 def registrarse():
     if request.method == 'POST':
