@@ -58,7 +58,7 @@ class Comentario(db.Model):
     id = db.Column(db.Integer,
                    primary_key=True)
     
-    texto_comentario = db.Column(db.String(500), 
+    texto_comentario = db.Column(db.Date, 
                                  nullable=False)
     
     fecha_creacion = db.Column(db.String(100), 

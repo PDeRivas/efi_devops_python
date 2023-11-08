@@ -15,5 +15,8 @@ app.config['JWT_SECRET_KEY'] = os.environ['JWT_SECRET_KEY']
 
 db = SQLAlchemy(app=app)
 migrate = Migrate(app, db)
+ma = Marshmallow(app)
+
+load_dotenv()
 
 from app.views import view
