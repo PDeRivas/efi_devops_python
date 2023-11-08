@@ -274,7 +274,7 @@ app.add_url_rule('/categoria', view_func=CategoriaAPI.as_view('categoria'))
 app.add_url_rule('/categoria/<categoria_id>', view_func=CategoriaAPI.as_view('categoria_por_id'))
 
 class Login(MethodView):
-    def post(self):
+    def get(self):
         data = request.authorization
         nombre = data.get('username')
         clave = data.get('password')
@@ -296,7 +296,7 @@ class Login(MethodView):
     
 app.add_url_rule('/login', view_func=Login.as_view('login'))
 
-def RutaAdmin(MethodView):
+class RutaLogeo(MethodView):
     @jwt_required()
     def get(self):
         current_user = get_jwt_identity()
@@ -304,17 +304,17 @@ def RutaAdmin(MethodView):
         if additional_info['is_admin']==1:
             return jsonify(
                 {
-                    "Mensaje":f"El usuario {current_user} tiene acceso a esta ruta",
+                    "Mensaje":f"El usuario {current_user} tiene acceso a esta ruta y es admin",
                     "Info Adicional": additional_info
                 }
             )
         return jsonify(
                 {
-                    "Mensaje":f"El usuario {current_user} no tiene acceso a esta ruta",
+                    "Mensaje":f"El usuario {current_user} tiene acceso a esta ruta y no es admin",
                 }
             )
 
-app.add_url_rule('/login', view_func=Login.as_view('login'))
+app.add_url_rule('/ruta_logeo', view_func=RutaLogeo.as_view('ruta_logeo'))
 
 @app.route('/')
 def index():
@@ -456,6 +456,7 @@ def editar():
     
 @app.route("/editar_post", methods=['POST'])
 def editar_post():
+
     if request.method=='POST':
         usuario_id = request.form['usuario_id']
         post_id = request.form['post_id']
@@ -468,3 +469,38 @@ def editar_post():
         db.session.commit()
 
     return redirect(url_for('inicio', usuario_id = usuario_id))
+
+@jwt.expired_token_loader
+def expired_token_callback(jwt_header, jwt_payload):
+    return (
+        jsonify(
+            {
+                "message": "El token ha expirado",
+                 "error": "token_expired"
+                 }
+                 ),
+        401,
+    )
+
+@jwt.invalid_token_loader
+def invalid_token_callback(error):
+    return (
+        jsonify(
+            {"message": "El token es invalido",
+             "error": "invalid_token"
+             }
+             ),
+        401,
+    )
+
+@jwt.unauthorized_loader
+def missing_token_callback(error):
+    return (
+        jsonify(
+            {
+                "message": "No se ingreso el token",
+                "error": "authorization_required",
+            }
+            ),
+        401,
+    )
