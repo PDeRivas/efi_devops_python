@@ -4,7 +4,7 @@ from sqlalchemy import ForeignKey
 class Usuario(db.Model):
     __tablename__ = 'usuario'
     id = db.Column(db.Integer, primary_key=True)
-    nombre = db.Column(db.String(100), nullable=False)
+    nombre = db.Column(db.String(100), nullable=False, unique=True)
     correo = db.Column(db.String(100), nullable=False)
     clave_hash = db.Column(db.String(100), nullable=False)
     is_admin = db.Column(db.Boolean, unique=False)
