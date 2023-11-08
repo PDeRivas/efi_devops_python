@@ -1,6 +1,14 @@
 from app import ma
 from marshmallow import fields
 
+class UsuarioSchema(ma.Schema):
+    id =  fields.Integer(dump_only=True)
+    nombre = fields.String()
+    correo = fields.String()
+    clave = fields.String()
+    is_admin = fields.Boolean()
+    clave_hash = fields.String()
+
 class PostSchema(ma.Schema):
     id =  fields.Integer(dump_only=True)
     titulo = fields.String()
@@ -8,14 +16,7 @@ class PostSchema(ma.Schema):
     fecha_creacion = fields.Date()
     autor_id = fields.Integer()
     categoria_id = fields.Integer()
-    user = fields.Integer()
-
-class UsuarioSchema(ma.Schema):
-    id =  fields.Integer(dump_only=True)
-    nombre = fields.String()
-    correo = fields.String()
-    clave = fields.String()
-    posts = fields.Nested(PostSchema, many=True)
+    autor = fields.Nested(UsuarioSchema)
 
 class ComentarioSchema(ma.Schema):
     id =  fields.Integer(dump_only=True)

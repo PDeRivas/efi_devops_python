@@ -1,7 +1,7 @@
 from flask.views import MethodView
+from datetime import datetime, timedelta
 
 from flask import (
-    Flask,
     jsonify,
     render_template,
     request,
@@ -9,7 +9,19 @@ from flask import (
     url_for
 )
 
-from app import app, db
+from app import app, db, jwt
+
+from flask_jwt_extended import (
+    create_access_token,
+    get_jwt,
+    get_jwt_identity,
+    jwt_required,
+)
+
+from werkzeug.security import (
+    generate_password_hash,
+    check_password_hash
+)
 
 from app.models.models import (
     Usuario,
@@ -24,8 +36,6 @@ from app.schemas.schema import (
     ComentarioSchema,
     CategoriaSchema,
 )
-
-from datetime import datetime
 
 @app.context_processor
 def inject_categorias():
@@ -66,13 +76,20 @@ class UsuarioAPI(MethodView):
         nombre = usuario_json.get('nombre')
         correo = usuario_json.get('correo')
         clave = usuario_json.get('clave')
+        is_admin = usuario_json.get('is_admin')
+        clave_hash = generate_password_hash(
+            clave, method='pbkdf2', salt_length=8
+        )
 
-        nuevo_usuario = Usuario(nombre=nombre, correo=correo, clave=clave)
-
+        nuevo_usuario = Usuario(nombre=nombre, correo=correo, clave_hash=clave_hash, is_admin=is_admin)
         db.session.add(nuevo_usuario)
         db.session.commit()
 
-        return jsonify(Mensaje=f"Usuario Creado")
+        return jsonify(
+            Mensaje=f"Usuario Creado",
+            Nombre=nombre,
+            clave_hash=clave_hash
+            ), 200
     
     def put(self, usuario_id):
         usuario = Usuario.query.get(usuario_id)
@@ -81,11 +98,14 @@ class UsuarioAPI(MethodView):
         nombre = usuario_json.get('nombre')
         correo = usuario_json.get('correo')
         clave = usuario_json.get('clave')
+        clave_hash = generate_password_hash(
+            clave, method='pbkdf2', salt_length=8
+        )
 
         usuario.nombre = nombre
         usuario.correo = correo
-        usuario.clave = clave
-
+        usuario.clave_hash = clave_hash
+        
         db.session.commit()
 
         return jsonify(Mensaje='Usuario Modificado', Schema=UsuarioSchema().dump(usuario))
@@ -253,6 +273,49 @@ class CategoriaAPI(MethodView):
 app.add_url_rule('/categoria', view_func=CategoriaAPI.as_view('categoria'))
 app.add_url_rule('/categoria/<categoria_id>', view_func=CategoriaAPI.as_view('categoria_por_id'))
 
+class Login(MethodView):
+    def post(self):
+        data = request.authorization
+        nombre = data.get('username')
+        clave = data.get('password')
+
+        usuario = Usuario.query.filter_by(nombre=nombre).first()
+        is_admin = usuario.is_admin
+
+        #check_password_hash(contraseña guardada, contraseña recibida)
+        if usuario and check_password_hash(usuario.clave_hash, clave):
+            access_token = create_access_token(
+                identity=nombre,
+                expires_delta=timedelta(minutes=100),
+                additional_claims=dict(
+                    is_admin=is_admin,
+                )
+            )
+            return jsonify({"ok":access_token})
+        return jsonify(Error="No pude generar el token"),400
+    
+app.add_url_rule('/login', view_func=Login.as_view('login'))
+
+def RutaAdmin(MethodView):
+    @jwt_required()
+    def get(self):
+        current_user = get_jwt_identity()
+        additional_info = get_jwt()
+        if additional_info['is_admin']==1:
+            return jsonify(
+                {
+                    "Mensaje":f"El usuario {current_user} tiene acceso a esta ruta",
+                    "Info Adicional": additional_info
+                }
+            )
+        return jsonify(
+                {
+                    "Mensaje":f"El usuario {current_user} no tiene acceso a esta ruta",
+                }
+            )
+
+app.add_url_rule('/login', view_func=Login.as_view('login'))
+
 @app.route('/')
 def index():
    return render_template(
@@ -336,7 +399,6 @@ def crear_post():
         db.session.commit() 
         return redirect(url_for('inicio', usuario_id = usuario_id))
     
-
 @app.route('/crear_comentario', methods=['POST'])
 def crear_comentario():
     if request.method=='POST':
