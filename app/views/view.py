@@ -1,3 +1,5 @@
+from flask.views import MethodView
+
 from flask import (
     Flask,
     jsonify,
@@ -16,10 +18,12 @@ from app.models.models import (
     Comentario,
 )
 
-"""from app.schemas.schema import (
+from app.schemas.schema import (
     PostSchema,
-    UserSchema,
-)"""
+    UsuarioSchema,
+    ComentarioSchema,
+    CategoriaSchema,
+)
 
 from datetime import datetime
 
@@ -44,6 +48,210 @@ def inject_comentarios():
     return dict(
         comentarios = comentarios
     )
+
+class UsuarioAPI(MethodView):
+    def get(self, usuario_id=None):
+        if usuario_id == None:
+            usuarios = Usuario.query.all()
+            usuario_schema = UsuarioSchema().dump(usuarios, many=True)
+        
+        else:
+            usuario = Usuario.query.get(usuario_id)
+            usuario_schema = UsuarioSchema().dump(usuario)
+        return jsonify(usuario_schema)
+    
+    def post(self):
+        usuario_json = UsuarioSchema().load(request.json)
+
+        nombre = usuario_json.get('nombre')
+        correo = usuario_json.get('correo')
+        clave = usuario_json.get('clave')
+
+        nuevo_usuario = Usuario(nombre=nombre, correo=correo, clave=clave)
+
+        db.session.add(nuevo_usuario)
+        db.session.commit()
+
+        return jsonify(Mensaje=f"Usuario Creado")
+    
+    def put(self, usuario_id):
+        usuario = Usuario.query.get(usuario_id)
+        usuario_json = UsuarioSchema().load(request.json)
+        
+        nombre = usuario_json.get('nombre')
+        correo = usuario_json.get('correo')
+        clave = usuario_json.get('clave')
+
+        usuario.nombre = nombre
+        usuario.correo = correo
+        usuario.clave = clave
+
+        db.session.commit()
+
+        return jsonify(Mensaje='Usuario Modificado', Schema=UsuarioSchema().dump(usuario))
+    
+    def delete(self, usuario_id):
+        usuario = Usuario.query.get(usuario_id)
+        db.session.delete(usuario)
+        db.session.commit()
+
+        return jsonify(Mensaje='Usuario Borrado')
+
+app.add_url_rule('/usuario', view_func=UsuarioAPI.as_view('usuario'))
+app.add_url_rule('/usuario/<usuario_id>', view_func=UsuarioAPI.as_view('usuario_por_id'))
+
+class PostAPI(MethodView):
+    def get(self, post_id=None):
+        if post_id == None:
+            posts = Post.query.all()
+            post_schema = PostSchema().dump(posts, many=True)
+        
+        else:
+            post = Post.query.get(post_id)
+            post_schema = PostSchema().dump(post)
+        return jsonify(post_schema)
+    
+    def post(self):
+        post_json = PostSchema().load(request.json)
+
+        autor_id = post_json.get('autor_id')
+        categoria_id = post_json.get('categoria_id')
+        titulo = post_json.get('titulo')
+        contenido = post_json.get('contenido')
+        fecha_creacion = datetime.now()
+
+        nuevo_post = Post(autor_id=autor_id, categoria_id=categoria_id, titulo=titulo, contenido=contenido, fecha_creacion=fecha_creacion)
+
+        db.session.add(nuevo_post)
+        db.session.commit()
+
+        return jsonify(Mensaje='Metodo Post')
+    
+    def put(self, post_id):
+        post = Post.query.get(post_id)
+        post_json = PostSchema().load(request.json)
+
+        autor_id = post_json.get('autor_id')
+        categoria_id = post_json.get('categoria_id')
+        titulo = post_json.get('titulo')
+        contenido = post_json.get('contenido')
+
+        post.autor_id = autor_id
+        post.categoria_id = categoria_id
+        post.titulo = titulo
+        post.contenido = contenido
+
+        db.session.commit()
+
+        return jsonify(PostSchema().dump(post))
+    
+    def delete(self, post_id):
+        post = Post.query.get(post_id)
+        db.session.delete(post)
+        db.session.commit()
+
+        return jsonify(Mensaje='Post Borrado')
+
+app.add_url_rule('/post', view_func=PostAPI.as_view('post'))
+app.add_url_rule('/post/<post_id>', view_func=PostAPI.as_view('post_por_id'))
+
+class ComentarioAPI(MethodView):
+    def get(self, comentario_id=None):
+        if comentario_id == None:
+            comentarios = Comentario.query.all()
+            comentario_schema = ComentarioSchema().dump(comentarios, many=True)
+        
+        else:
+            comentario = Comentario.query.get(comentario_id)
+            comentario_schema = ComentarioSchema().dump(comentario)
+        return jsonify(comentario_schema)
+    
+    def post(self):
+        comentario_json = ComentarioSchema().load(request.json)
+        texto_comentario = comentario_json.get('texto_comentario')
+
+        fecha_creacion = datetime.now()
+        autor_id = comentario_json.get('autor_id')
+        post_id = comentario_json.get('post_id')
+
+        nuevo_comentario = Comentario(texto_comentario=texto_comentario, fecha_creacion=fecha_creacion, autor_id=autor_id, post_id=post_id)
+
+        db.session.add(nuevo_comentario)
+        db.session.commit()
+
+        return jsonify(Mensaje='Comentario Creado')
+    
+    def put(self, comentario_id):
+        comentario = Comentario.query.get(comentario_id)
+        comentario_json = ComentarioSchema().load(request.json)
+
+        texto_comentario = comentario_json.get('texto_comentario')
+        autor_id = comentario_json.get('autor_id')
+        post_id = comentario_json.get('post_id')
+
+        comentario.texto_comentario = texto_comentario
+        comentario.autor_id = autor_id
+        comentario.post_id = post_id
+
+        db.session.commit()
+
+        return jsonify(ComentarioSchema().dump(comentario))
+    
+    def delete(self, comentario_id):
+        comentario = Comentario.query.get(comentario_id)
+        db.session.delete(comentario)
+        db.session.commit()
+
+        return jsonify(Mensaje='Comentario Borrado')
+
+app.add_url_rule('/comentario', view_func=ComentarioAPI.as_view('comentario'))
+app.add_url_rule('/comentario/<comentario_id>', view_func=ComentarioAPI.as_view('comentario_por_id'))
+
+class CategoriaAPI(MethodView):
+    def get(self, categoria_id=None):
+        if categoria_id == None:
+            categorias = Categoria.query.all()
+            categoria_schema = CategoriaSchema().dump(categorias, many=True)
+        
+        else:
+            categoria = Categoria.query.get(categoria_id)
+            categoria_schema = CategoriaSchema().dump(categoria)
+        return jsonify(categoria_schema)
+    
+    def post(self):
+        categoria_json = CategoriaSchema().load(request.json)
+        texto_categoria = categoria_json.get('texto_categoria')
+
+        categoria = categoria_json.get('categoria')
+
+        nueva_categoria = Categoria(categoria=categoria)
+
+        db.session.add(nueva_categoria)
+        db.session.commit()
+
+        return jsonify(Mensaje='Categoria Creada')
+    
+    def put(self, categoria_id):
+        categoria_modificar = Categoria.query.get(categoria_id)
+        categoria_json = CategoriaSchema().load(request.json)
+
+        categoria = categoria_json.get('categoria')
+
+        categoria_modificar.categoria = categoria
+
+        db.session.commit()
+
+        return jsonify(CategoriaSchema().dump(categoria_modificar))
+    
+    def delete(self, categoria_id):
+        categoria = Categoria.query.get(categoria_id)
+        db.session.delete(categoria)
+        db.session.commit()
+
+        return jsonify(Mensaje='Categoria Borrada')
+
+app.add_url_rule('/categoria', view_func=CategoriaAPI.as_view('categoria'))
+app.add_url_rule('/categoria/<categoria_id>', view_func=CategoriaAPI.as_view('categoria_por_id'))
 
 @app.route('/')
 def index():
