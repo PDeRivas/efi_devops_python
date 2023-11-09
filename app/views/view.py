@@ -290,37 +290,51 @@ class CategoriaAPI(MethodView):
             categoria_schema = CategoriaSchema().dump(categoria)
         return jsonify(categoria_schema)
     
+    @jwt_required()
     def post(self):
-        categoria_json = CategoriaSchema().load(request.json)
-        texto_categoria = categoria_json.get('texto_categoria')
+        additional_info = get_jwt()
+        is_admin = additional_info['is_admin']
+        if is_admin:
+            categoria_json = CategoriaSchema().load(request.json)
 
-        categoria = categoria_json.get('categoria')
+            categoria = categoria_json.get('categoria')
 
-        nueva_categoria = Categoria(categoria=categoria)
+            nueva_categoria = Categoria(categoria=categoria)
 
-        db.session.add(nueva_categoria)
-        db.session.commit()
+            db.session.add(nueva_categoria)
+            db.session.commit()
 
-        return jsonify(Mensaje='Categoria Creada')
+            return jsonify(Mensaje='Categoria Creada')
+        return jsonify(Mensaje='No tiene permiso para agregar categorias'), 401
     
+    @jwt_required()
     def put(self, categoria_id):
-        categoria_modificar = Categoria.query.get(categoria_id)
-        categoria_json = CategoriaSchema().load(request.json)
+        additional_info = get_jwt()
+        is_admin = additional_info['is_admin']
+        if is_admin:
+            categoria_modificar = Categoria.query.get(categoria_id)
+            categoria_json = CategoriaSchema().load(request.json)
 
-        categoria = categoria_json.get('categoria')
+            categoria = categoria_json.get('categoria')
 
-        categoria_modificar.categoria = categoria
+            categoria_modificar.categoria = categoria
 
-        db.session.commit()
+            db.session.commit()
 
-        return jsonify(CategoriaSchema().dump(categoria_modificar))
+            return jsonify(CategoriaSchema().dump(categoria_modificar))
+        return jsonify(Mensaje='No tiene permiso para modificar categorias'), 401
     
+    @jwt_required()
     def delete(self, categoria_id):
-        categoria = Categoria.query.get(categoria_id)
-        db.session.delete(categoria)
-        db.session.commit()
+        additional_info = get_jwt()
+        is_admin = additional_info['is_admin']
+        if is_admin:
+            categoria = Categoria.query.get(categoria_id)
+            db.session.delete(categoria)
+            db.session.commit()
 
-        return jsonify(Mensaje='Categoria Borrada')
+            return jsonify(Mensaje='Categoria Borrada')
+        return jsonify(Mensaje='No tiene permiso para borrar categorias'), 401
 
 app.add_url_rule('/categoria', view_func=CategoriaAPI.as_view('categoria'))
 app.add_url_rule('/categoria/<categoria_id>', view_func=CategoriaAPI.as_view('categoria_por_id'))
