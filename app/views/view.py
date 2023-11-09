@@ -74,7 +74,13 @@ class UsuarioAPI(MethodView):
         usuario_json = UsuarioSchema().load(request.json)
 
         nombre = usuario_json.get('nombre')
+        if Usuario.query.filter_by(nombre=nombre).first() != None:
+            return jsonify(Mensaje='El nombre de usuario ya existe'), 409
+        
         correo = usuario_json.get('correo')
+        if Usuario.query.filter_by(correo=correo).first() != None:
+            return jsonify(Mensaje='El correo ya esta en uso'), 409
+        
         clave = usuario_json.get('clave')
         is_admin = usuario_json.get('is_admin')
         clave_hash = generate_password_hash(
@@ -90,32 +96,48 @@ class UsuarioAPI(MethodView):
             Nombre=nombre,
             clave_hash=clave_hash
             ), 200
-    
+        
+    @jwt_required()
     def put(self, usuario_id):
-        usuario = Usuario.query.get(usuario_id)
-        usuario_json = UsuarioSchema().load(request.json)
-        
-        nombre = usuario_json.get('nombre')
-        correo = usuario_json.get('correo')
-        clave = usuario_json.get('clave')
-        clave_hash = generate_password_hash(
-            clave, method='pbkdf2', salt_length=8
-        )
+        current_user = get_jwt_identity()
+        additional_info = get_jwt()
+        if additional_info['usuario_id']==usuario_id or additional_info['is_admin']:
+                    usuario = Usuario.query.get(usuario_id)
+                    usuario_json = UsuarioSchema().load(request.json)
+                    
+                    nombre = usuario_json.get('nombre')
+                    if Usuario.query.filter_by(nombre=nombre).first() != None:
+                        return jsonify(Mensaje='El nombre de usuario ya existe'), 409
+                    
+                    correo = usuario_json.get('correo')
+                    if Usuario.query.filter_by(correo=correo).first() != None:
+                        return jsonify(Mensaje='El correo ya esta en uso'), 409
 
-        usuario.nombre = nombre
-        usuario.correo = correo
-        usuario.clave_hash = clave_hash
-        
-        db.session.commit()
+                    clave = usuario_json.get('clave')
+                    clave_hash = generate_password_hash(
+                        clave, method='pbkdf2', salt_length=8
+                    )
 
-        return jsonify(Mensaje='Usuario Modificado', Schema=UsuarioSchema().dump(usuario))
-    
+                    usuario.nombre = nombre
+                    usuario.correo = correo
+                    usuario.clave_hash = clave_hash
+                    
+                    db.session.commit()
+
+                    return jsonify(Mensaje='Usuario Modificado', Schema=UsuarioSchema().dump(usuario))
+        return jsonify({"Mensaje":f"No tiene acceso para modificar a este usuario"}), 401
+
+    @jwt_required()
     def delete(self, usuario_id):
-        usuario = Usuario.query.get(usuario_id)
-        db.session.delete(usuario)
-        db.session.commit()
-
-        return jsonify(Mensaje='Usuario Borrado')
+        current_user = get_jwt_identity()
+        additional_info = get_jwt()
+        if additional_info['usuario_id']==usuario_id or additional_info['is_admin']:
+            usuario = Usuario.query.get(usuario_id)
+            db.session.delete(usuario)
+            db.session.commit()
+            return jsonify(Mensaje='Usuario Borrado')
+        
+        return jsonify(Mensaje='No tiene acceso para borrar este usuario'), 401
 
 app.add_url_rule('/usuario', view_func=UsuarioAPI.as_view('usuario'))
 app.add_url_rule('/usuario/<usuario_id>', view_func=UsuarioAPI.as_view('usuario_por_id'))
@@ -131,10 +153,13 @@ class PostAPI(MethodView):
             post_schema = PostSchema().dump(post)
         return jsonify(post_schema)
     
+    @jwt_required()
     def post(self):
+        current_user = get_jwt_identity()
+        additional_info = get_jwt()
         post_json = PostSchema().load(request.json)
 
-        autor_id = post_json.get('autor_id')
+        autor_id = additional_info['usuario_id']
         categoria_id = post_json.get('categoria_id')
         titulo = post_json.get('titulo')
         contenido = post_json.get('contenido')
@@ -145,32 +170,46 @@ class PostAPI(MethodView):
         db.session.add(nuevo_post)
         db.session.commit()
 
-        return jsonify(Mensaje='Metodo Post')
+        return jsonify(Mensaje='Post Creado')
     
+    @jwt_required()
     def put(self, post_id):
-        post = Post.query.get(post_id)
-        post_json = PostSchema().load(request.json)
+        additional_info = get_jwt()
+        post_db = Post.query.get(post_id)
+        autor_id = post_db.autor_id
+        usuario_id = additional_info['usuario_id']
+        if usuario_id == autor_id:
+            post = Post.query.get(post_id)
+            post_json = PostSchema().load(request.json)
 
-        autor_id = post_json.get('autor_id')
-        categoria_id = post_json.get('categoria_id')
-        titulo = post_json.get('titulo')
-        contenido = post_json.get('contenido')
+            categoria_id = post_json.get('categoria_id')
+            titulo = post_json.get('titulo')
+            contenido = post_json.get('contenido')
 
-        post.autor_id = autor_id
-        post.categoria_id = categoria_id
-        post.titulo = titulo
-        post.contenido = contenido
+            post.categoria_id = categoria_id
+            post.titulo = titulo
+            post.contenido = contenido
 
-        db.session.commit()
+            db.session.commit()
 
-        return jsonify(PostSchema().dump(post))
+            return jsonify(PostSchema().dump(post))
+        
+        return jsonify(Mensaje="Solo el creador del post puede modificarlo"), 401
     
+    @jwt_required()
     def delete(self, post_id):
-        post = Post.query.get(post_id)
-        db.session.delete(post)
-        db.session.commit()
+        additional_info = get_jwt()
+        post_db = Post.query.get(post_id)
+        autor_id = post_db.autor_id
+        usuario_id = additional_info['usuario_id']
 
-        return jsonify(Mensaje='Post Borrado')
+        if usuario_id == autor_id or additional_info['is_admin']:
+            post = Post.query.get(post_id)
+            db.session.delete(post)
+            db.session.commit()
+            return jsonify(Mensaje='Post Borrado')
+        
+        return jsonify(Mensaje='No tiene autorizacion para borrar el post')
 
 app.add_url_rule('/post', view_func=PostAPI.as_view('post'))
 app.add_url_rule('/post/<post_id>', view_func=PostAPI.as_view('post_por_id'))
@@ -186,13 +225,16 @@ class ComentarioAPI(MethodView):
             comentario_schema = ComentarioSchema().dump(comentario)
         return jsonify(comentario_schema)
     
+    @jwt_required()
     def post(self):
+        additional_info = get_jwt()
+
         comentario_json = ComentarioSchema().load(request.json)
         texto_comentario = comentario_json.get('texto_comentario')
 
-        fecha_creacion = datetime.now()
-        autor_id = comentario_json.get('autor_id')
         post_id = comentario_json.get('post_id')
+        autor_id = additional_info['usuario_id']
+        fecha_creacion = datetime.now()
 
         nuevo_comentario = Comentario(texto_comentario=texto_comentario, fecha_creacion=fecha_creacion, autor_id=autor_id, post_id=post_id)
 
@@ -201,28 +243,38 @@ class ComentarioAPI(MethodView):
 
         return jsonify(Mensaje='Comentario Creado')
     
+    @jwt_required()
     def put(self, comentario_id):
+        additional_info = get_jwt()
         comentario = Comentario.query.get(comentario_id)
-        comentario_json = ComentarioSchema().load(request.json)
+        autor_id = comentario.autor_id
+        usuario_id = additional_info['usuario_id']
 
-        texto_comentario = comentario_json.get('texto_comentario')
-        autor_id = comentario_json.get('autor_id')
-        post_id = comentario_json.get('post_id')
+        if usuario_id == autor_id:
+            comentario_json = ComentarioSchema().load(request.json)
 
-        comentario.texto_comentario = texto_comentario
-        comentario.autor_id = autor_id
-        comentario.post_id = post_id
+            texto_comentario = comentario_json.get('texto_comentario')
+            comentario.texto_comentario = texto_comentario
 
-        db.session.commit()
+            db.session.commit()
 
-        return jsonify(ComentarioSchema().dump(comentario))
+
+            return jsonify(ComentarioSchema().dump(comentario))
+        
+        return jsonify(Mensaje="Solo el creador del comentario puede modificarlo"), 401
     
+    @jwt_required()
     def delete(self, comentario_id):
+        additional_info = get_jwt()
         comentario = Comentario.query.get(comentario_id)
-        db.session.delete(comentario)
-        db.session.commit()
-
-        return jsonify(Mensaje='Comentario Borrado')
+        autor_id = comentario.autor_id
+        usuario_id = additional_info['usuario_id']
+        
+        if usuario_id == autor_id or additional_info['is_admin']:
+            db.session.delete(comentario)
+            db.session.commit()
+            return jsonify(Mensaje='Comentario Borrado')
+        return jsonify(Mensaje='No tiene autorizacion para borrar el comentario'), 401
 
 app.add_url_rule('/comentario', view_func=ComentarioAPI.as_view('comentario'))
 app.add_url_rule('/comentario/<comentario_id>', view_func=ComentarioAPI.as_view('comentario_por_id'))
@@ -238,43 +290,57 @@ class CategoriaAPI(MethodView):
             categoria_schema = CategoriaSchema().dump(categoria)
         return jsonify(categoria_schema)
     
+    @jwt_required()
     def post(self):
-        categoria_json = CategoriaSchema().load(request.json)
-        texto_categoria = categoria_json.get('texto_categoria')
+        additional_info = get_jwt()
+        is_admin = additional_info['is_admin']
+        if is_admin:
+            categoria_json = CategoriaSchema().load(request.json)
 
-        categoria = categoria_json.get('categoria')
+            categoria = categoria_json.get('categoria')
 
-        nueva_categoria = Categoria(categoria=categoria)
+            nueva_categoria = Categoria(categoria=categoria)
 
-        db.session.add(nueva_categoria)
-        db.session.commit()
+            db.session.add(nueva_categoria)
+            db.session.commit()
 
-        return jsonify(Mensaje='Categoria Creada')
+            return jsonify(Mensaje='Categoria Creada')
+        return jsonify(Mensaje='No tiene permiso para agregar categorias'), 401
     
+    @jwt_required()
     def put(self, categoria_id):
-        categoria_modificar = Categoria.query.get(categoria_id)
-        categoria_json = CategoriaSchema().load(request.json)
+        additional_info = get_jwt()
+        is_admin = additional_info['is_admin']
+        if is_admin:
+            categoria_modificar = Categoria.query.get(categoria_id)
+            categoria_json = CategoriaSchema().load(request.json)
 
-        categoria = categoria_json.get('categoria')
+            categoria = categoria_json.get('categoria')
 
-        categoria_modificar.categoria = categoria
+            categoria_modificar.categoria = categoria
 
-        db.session.commit()
+            db.session.commit()
 
-        return jsonify(CategoriaSchema().dump(categoria_modificar))
+            return jsonify(CategoriaSchema().dump(categoria_modificar))
+        return jsonify(Mensaje='No tiene permiso para modificar categorias'), 401
     
+    @jwt_required()
     def delete(self, categoria_id):
-        categoria = Categoria.query.get(categoria_id)
-        db.session.delete(categoria)
-        db.session.commit()
+        additional_info = get_jwt()
+        is_admin = additional_info['is_admin']
+        if is_admin:
+            categoria = Categoria.query.get(categoria_id)
+            db.session.delete(categoria)
+            db.session.commit()
 
-        return jsonify(Mensaje='Categoria Borrada')
+            return jsonify(Mensaje='Categoria Borrada')
+        return jsonify(Mensaje='No tiene permiso para borrar categorias'), 401
 
 app.add_url_rule('/categoria', view_func=CategoriaAPI.as_view('categoria'))
 app.add_url_rule('/categoria/<categoria_id>', view_func=CategoriaAPI.as_view('categoria_por_id'))
 
 class Login(MethodView):
-    def get(self):
+    def post(self):
         data = request.authorization
         nombre = data.get('username')
         clave = data.get('password')
@@ -288,11 +354,12 @@ class Login(MethodView):
                 identity=nombre,
                 expires_delta=timedelta(minutes=100),
                 additional_claims=dict(
+                    usuario_id=usuario.id,
                     is_admin=is_admin,
                 )
             )
             return jsonify({"ok":access_token})
-        return jsonify(Error="No pude generar el token"),400
+        return jsonify(Error="El usuario y la contraseña no coinciden"),401
     
 app.add_url_rule('/login', view_func=Login.as_view('login'))
 
